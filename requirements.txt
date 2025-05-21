@@ -18,7 +18,6 @@ numpy
 argparse
 requests
 ldap3
-# boto3
 boto3==1.7.84
 botocore==1.10.84
 jsonschema
@@ -26,3 +25,7 @@ papermill
 python-dotenv
 pytest
 pytest-mock
+shutil
+python-dateutil
+base64
+io
