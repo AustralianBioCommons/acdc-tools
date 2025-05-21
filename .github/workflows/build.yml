@@ -24,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: 3.13.3
 
       - name: Create virtual environment
         run: python3 -m venv .venv
@@ -61,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: 3.13.3
 
       - name: Restore cached dependencies
         uses: actions/cache@v3
