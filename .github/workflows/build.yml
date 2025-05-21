@@ -32,6 +32,9 @@ jobs:
       - name: Activate virtual environment
         run: source .venv/bin/activate
 
+      - name: install fastavro
+        run: pip install fastavro --prefer-binary
+
       - name: Install requirements
         run: |
           source .venv/bin/activate
