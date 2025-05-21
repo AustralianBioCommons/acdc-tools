@@ -12,6 +12,7 @@ on:
       - main
       - 'feature-*'
       - 'bugfix-*'
+  workflow_dispatch:
 
 jobs:
   build:
