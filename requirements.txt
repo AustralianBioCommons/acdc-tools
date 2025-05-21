@@ -25,7 +25,6 @@ papermill
 python-dotenv
 pytest
 pytest-mock
-shutil
 python-dateutil
 base64
 io
