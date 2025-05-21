@@ -18,8 +18,8 @@ numpy
 argparse
 requests
 ldap3
-boto3
-botocore
+boto3==1.26.90
+botocore==1.29.90
 jsonschema
 papermill
 python-dotenv
