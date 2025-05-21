@@ -24,16 +24,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.13.3
+          python-version: 3.12
 
       - name: Create virtual environment
         run: python3 -m venv .venv
 
       - name: Activate virtual environment
         run: source .venv/bin/activate
-
-      - name: install fastavro
-        run: pip install fastavro --prefer-binary
 
       - name: Install requirements
         run: |
@@ -64,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.13.3
+          python-version: 3.12
 
       - name: Restore cached dependencies
         uses: actions/cache@v3
