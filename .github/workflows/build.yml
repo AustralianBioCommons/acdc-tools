@@ -18,23 +18,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Free Disk Space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: 3.9.5
 
       - name: Create virtual environment
         run: python3 -m venv .venv
@@ -71,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: 3.9.5
 
       - name: Restore cached dependencies
         uses: actions/cache@v3
