@@ -26,5 +26,3 @@ python-dotenv
 pytest
 pytest-mock
 python-dateutil
-base64
-io
