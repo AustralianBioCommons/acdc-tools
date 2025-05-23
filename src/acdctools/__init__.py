@@ -3,3 +3,4 @@ from .validation_reporter.write_data import *
 from .validation_reporter.gen3validate import *
 from .aws import *
 from .indexd.indexd_metadata import *
+from .uploader.metadata_upload import *
