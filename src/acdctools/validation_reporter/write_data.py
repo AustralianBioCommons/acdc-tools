@@ -97,25 +97,22 @@ class WriteData:
     
     def write_nodes_to_json(self):
         # remove indexes for colnames not found in schema
-        node_indexes = self.node_indexes
-        del node_indexes['None']
+        node_indexes = {k: v for k, v in self.node_indexes.items() if k != 'None'}
         
         # this loop subsets the input dataframe based on the indexes for each node
-        for node, value in self.node_indexes.items():
-            
+        for node, value in node_indexes.items():
             # patient_id with index 0 should be added to every node reference
             if 0 in value:
                 value.remove(0)
             value.append(0)
             
-            # print(value)
             output_df = self.input_df.iloc[:, value]
             output_file_path = f"{self.output_dir}/{node}.json"
 
             output_json = json.loads(output_df.to_json(orient='records'))
             output_json = self.apply_linkage_metadata(output_json, node)
             
-            with open(output_file_path, 'w') as f:
+            with open(output_file_path, 'w', encoding='utf-8') as f:
                 json.dump(output_json, f, indent=4)
                 
             print(f"Dataframe for node '{node}' successfully written to {output_file_path}")
