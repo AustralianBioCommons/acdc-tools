@@ -6,11 +6,13 @@ on:
       - main
       - 'feature-*'
       - 'bugfix-*'
+      - 'fix-*'
   pull_request:
     branches:
       - main
       - 'feature-*'
       - 'bugfix-*'
+  workflow_dispatch:
 
 jobs:
   build:

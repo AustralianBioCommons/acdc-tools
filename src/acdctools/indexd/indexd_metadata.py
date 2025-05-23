@@ -4,18 +4,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import json
 import logging
-
+import botocore
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
-class IndexdMetadata:
-    """
-    A class for constructing the file metadata for indexd upload.
-    """
 
-    def __init__(self, json_data_path: str, bucket_name: str, bucket_subdir: str, n_rows: int = None):
+class IndexdMetadata:
+    def __init__(
+        self,
+        json_data_path: str,
+        bucket_name: str,
+        bucket_subdir: str,
+        n_rows: int = None,
+    ):
         """
         Initializes the IndexdMetadata object.
 
@@ -29,8 +32,6 @@ class IndexdMetadata:
         self.bucket_subdir = bucket_subdir
         self.n_rows = n_rows
         self._check_json_data_is_file()
-    
-        
 
     def _check_json_data_is_file(self):
         """
@@ -40,7 +41,7 @@ class IndexdMetadata:
             Exception: If the filename does not contain '_file'.
         """
         filename = os.path.basename(self.json_data_path)
-        if '_file' not in filename:
+        if "_file" not in filename:
             raise Exception(
                 f"{filename} invalid | The json_data_path must be metadata for a file and contain the extension '_file'."
             )
@@ -49,7 +50,7 @@ class IndexdMetadata:
         if nrows is None:
             nrows = self.n_rows
         try:
-            with open(json_data_path, 'r') as f:
+            with open(json_data_path, "r") as f:
                 data = json.load(f)
                 if nrows is not None and isinstance(data, list):
                     data = data[:nrows]
@@ -64,12 +65,13 @@ class IndexdMetadata:
         try:
             # Create directory if it does not exist
             os.makedirs(os.path.dirname(json_data_path), exist_ok=True)
-
-            with open(json_data_path, 'w') as f:
+            with open(json_data_path, "w") as f:
                 json.dump(data, f, indent=4)
                 logger.info(f"JSON data written to {json_data_path}")
         except Exception as e:
-            logger.error(f"Error writing JSON data to {json_data_path}: {e}")
+            logger.error(
+                f"Error writing JSON data to {json_data_path}: {e}"
+            )
 
     def create_s3_uri(self, file_path: str) -> str:
         """
@@ -81,12 +83,23 @@ class IndexdMetadata:
         Returns:
             str: The constructed S3 URI.
         """
-        strip_file_path = file_path.lstrip('./')
-        s3_uri = f"s3://{self.bucket_name}/{self.bucket_subdir}/{strip_file_path}"
+        if file_path.startswith("./"):
+            strip_file_path = file_path.lstrip("./")
+        elif file_path.startswith("~/"):
+            strip_file_path = file_path.lstrip("~/")
+        else:
+            strip_file_path = file_path
+
+        s3_uri = (
+            f"s3://{self.bucket_name}/{self.bucket_subdir}/{strip_file_path}"
+        )
+        logger.info(
+            f"Constructed S3 URI: {s3_uri} from file_path: {file_path}"
+        )
         return s3_uri
 
     def get_file_key_path(self, s3_uri: str) -> str:
-        return '/'.join(s3_uri.split('/')[3:])
+        return "/".join(s3_uri.split("/")[3:])
 
     def pull_s3_md5sum(self, s3_uri: str) -> str:
         """
@@ -101,15 +114,39 @@ class IndexdMetadata:
         Raises:
             Exception: If there is an error pulling the MD5 checksum or if the ETag is not found.
         """
-        s3 = boto3.client('s3')
+        s3 = boto3.client("s3")
         try:
+            logger.info(
+                f"Attempting to pull MD5 checksum for S3 URI: {s3_uri}"
+            )
             response = s3.head_object(
                 Bucket=self.bucket_name, Key=self.get_file_key_path(s3_uri)
             )
-            return response['ETag'].strip('"')
-        except boto3.exceptions.Boto3Error as e:
-            raise Exception(f"Failed to pull MD5 checksum for {s3_uri}, error: {e}")
+            logger.info(
+                f"Successfully retrieved head_object for {s3_uri}"
+            )
+            return response["ETag"].strip('"')
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code")
+            logger.error(
+                f"ClientError when pulling MD5 checksum for {s3_uri}: {e}"
+            )
+            if error_code in ("404", "NoSuchKey"):
+                raise Exception(f"File not found on S3 (404): {s3_uri}")
+            raise Exception(
+                f"Failed to pull MD5 checksum for {s3_uri}, error: {e}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error when pulling MD5 checksum for {s3_uri}: {e}"
+            )
+            raise Exception(
+                f"Failed to pull MD5 checksum for {s3_uri}, error: {e}"
+            )
         except KeyError:
+            logger.error(
+                f"ETag not found in the response for {s3_uri}"
+            )
             raise Exception(f"ETag not found in the response for {s3_uri}")
 
     def validate_s3_uri(self, s3_uri: str) -> str:
@@ -125,11 +162,10 @@ class IndexdMetadata:
         Raises:
             Exception: If the S3 URI is invalid or the MD5 checksum cannot be retrieved.
         """
-        # testing if s3_uri is valid and returns an md5
         md5 = self.pull_s3_md5sum(s3_uri)
         if md5:
             return s3_uri
-        logging.error(f"Invalid S3 URI: {s3_uri}")
+        logger.error(f"Invalid S3 URI: {s3_uri}")
         raise Exception(f"Invalid S3 URI: {s3_uri}")
 
     def generate_did(self, md5: str, prefix: str = "PREFIX") -> str:
@@ -165,16 +201,20 @@ class IndexdMetadata:
         Raises:
             Exception: If there is an error pulling the file size or if the ContentLength is not found.
         """
-        s3 = boto3.client('s3')
+        s3 = boto3.client("s3")
         try:
             response = s3.head_object(
                 Bucket=self.bucket_name, Key=self.get_file_key_path(s3_uri)
             )
-            return response['ContentLength']
+            return response["ContentLength"]
         except boto3.exceptions.Boto3Error as e:
-            raise Exception(f"Failed to pull file size for {s3_uri}, error: {e}")
+            raise Exception(
+                f"Failed to pull file size for {s3_uri}, error: {e}"
+            )
         except KeyError:
-            raise Exception(f"ContentLength not found in the response for {s3_uri}")
+            raise Exception(
+                f"ContentLength not found in the response for {s3_uri}"
+            )
 
     def get_authz(self, program: str, project: str) -> list:
         """
@@ -189,8 +229,8 @@ class IndexdMetadata:
         """
         auth_string = f"programs/{program}/projects/{project}"
         return [auth_string]
-    
-    def generate_baseid(self, filename:str) -> str:
+
+    def generate_baseid(self, filename: str) -> str:
         """
         Generates a base ID (GUID) from the provided filename.
 
@@ -203,7 +243,9 @@ class IndexdMetadata:
         baseid = uuid.uuid5(uuid.NAMESPACE_DNS, filename)
         return str(baseid)
 
-    def construct_metadata(self, s3_uri: str, program: str, project: str) -> dict:
+    def construct_metadata(
+        self, s3_uri: str, program: str, project: str
+    ) -> dict:
         """
         Subprocess function that takes in an s3_uri, pulls S3 metadata into a structured format
         that is useful for indexd API upload. Program and project are used to define the authz resource.
@@ -218,12 +260,11 @@ class IndexdMetadata:
         """
         self.validate_s3_uri(s3_uri)
         md5sum = self.pull_s3_md5sum(s3_uri)
-
         did = self.generate_did(md5sum)
         filesize = self.pull_filesize(s3_uri)
         authz = self.get_authz(program=program, project=project)
         file_key_path = self.get_file_key_path(s3_uri)
-        file_name = file_key_path.split('/')[-1]
+        file_name = file_key_path.split("/")[-1]
 
         indexd_metadata = {
             "hashes": {"md5": md5sum},
@@ -238,11 +279,13 @@ class IndexdMetadata:
             "version": None,
             "authz": authz,
             "content_created_date": None,
-            "content_updated_date":None,
+            "content_updated_date": None,
         }
         return indexd_metadata
 
-    def update_metadata_indexd(self, json_data: dict, program: str, project: str):
+    def update_metadata_indexd(
+        self, json_data: dict, program: str, project: str
+    ):
         """
         Iterates through each object in the JSON data, constructs an S3 URI from the file path,
         validates the S3 URI, and generates a metadata dictionary using the S3 URI. This metadata
@@ -263,8 +306,10 @@ class IndexdMetadata:
         def process_object(obj):
             s3_uri = self.create_s3_uri(obj["file_path"])
             self.validate_s3_uri(s3_uri)
-            indexd_metadata_dict = self.construct_metadata(s3_uri, program, project)
-            obj['object_id'] = indexd_metadata_dict['did']
+            indexd_metadata_dict = self.construct_metadata(
+                s3_uri, program, project
+            )
+            obj["object_id"] = indexd_metadata_dict["did"]
             return obj, s3_uri, indexd_metadata_dict
 
         combined_indexd_metadata = []
@@ -273,7 +318,9 @@ class IndexdMetadata:
             future_to_obj = {
                 executor.submit(process_object, obj): obj for obj in json_data
             }
-            for idx, future in enumerate(as_completed(future_to_obj), start=1):
+            for idx, future in enumerate(
+                as_completed(future_to_obj), start=1
+            ):
                 obj, s3_uri, indexd_metadata_dict = future.result()
                 combined_indexd_metadata.append(indexd_metadata_dict)
                 percentage_complete = (idx / total_objects) * 100
@@ -284,6 +331,34 @@ class IndexdMetadata:
 
         logger.info("All S3 URIs processed.")
         return json_data, combined_indexd_metadata
+
+    def compile_indexd_metadata(self, program: str, project: str):
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        indexd_metadata_dict = {}
+        total_uris = len(self.s3_uri_list)
+
+        with ThreadPoolExecutor() as executor:
+            future_to_s3_uri = {
+                executor.submit(
+                    self.construct_metadata, s3_uri, program, project
+                ): s3_uri
+                for s3_uri in self.s3_uri_list
+            }
+            for index, future in enumerate(
+                as_completed(future_to_s3_uri), start=1
+            ):
+                s3_uri, indexd_metadata = future.result()
+                indexd_metadata_dict[s3_uri] = indexd_metadata
+                percentage_complete = (index / total_uris) * 100
+                logger.info(
+                    f"Pulling S3 Metadata for {index} of {total_uris} "
+                    f"({percentage_complete:.2f}%): {s3_uri}"
+                )
+
+        self.indexd_metadata_dict = indexd_metadata_dict
+        logger.info("All S3 URIs processed.")
+        return indexd_metadata_dict
 
     def n_missing_object_id(self, json_data: dict) -> dict:
         """
@@ -304,13 +379,16 @@ class IndexdMetadata:
             "missing_indexes": [],
         }
         for idx, obj in enumerate(json_data):
-            if isinstance(obj, dict) and 'object_id' not in obj:
-                output_dict['missing_uris'].append(obj.get('file_path', 'Unknown'))
-                output_dict['missing_indexes'].append(idx)
+            if isinstance(obj, dict) and "object_id" not in obj:
+                output_dict["missing_uris"].append(
+                    obj.get("file_path", "Unknown")
+                )
+                output_dict["missing_indexes"].append(idx)
 
-        if len(output_dict['missing_indexes']) == 0:
+        if len(output_dict["missing_indexes"]) == 0:
             logger.info("SUCCESS: All JSON objects have 'object_id' entries.")
         else:
-            logger.warning("WARNING: Not all JSON objects have 'object_id' entries.")
+            logger.warning(
+                "WARNING: Not all JSON objects have 'object_id' entries."
+            )
         return output_dict
-
