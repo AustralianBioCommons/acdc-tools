@@ -493,10 +493,17 @@ class SchemaValidatorSynth:
         plt.show()
         
 class QuickValidateSynth:
-    def __init__(self, data_dir: str, project_name_list: list, resolved_schema_dir: str, exclude_nodes: list = None):
+    def __init__(self, data_dir: str, project_name_list: list, resolved_schema_path: str, exclude_nodes: list = None):
+        """
+        Args:
+            data_dir (str): Directory containing project data.
+            project_name_list (list): List of project names.
+            resolved_schema_path (str): Path to the resolved schema file (not a directory).
+            exclude_nodes (list, optional): List of node names to exclude.
+        """
         self.data_dir = data_dir
         self.project_name_list = project_name_list
-        self.resolved_schema_dir = resolved_schema_dir
+        self.resolved_schema_path = resolved_schema_path
         self.exclude_nodes = exclude_nodes if exclude_nodes is not None else []
         self.json_paths = []
         self.nodes = []
@@ -516,7 +523,10 @@ class QuickValidateSynth:
                 for file in os.listdir(os.path.join(self.data_dir, project_name))
                 if file.endswith('.json')
             ]
-            filtered_json_paths = [path for path in json_paths if not any(exclude_node in path for exclude_node in self.exclude_nodes)]            # print(f'Generated JSON paths: {filtered_json_paths}')
+            filtered_json_paths = [
+                path for path in json_paths
+                if not any(exclude_node in path for exclude_node in self.exclude_nodes)
+            ]
             return filtered_json_paths
         except Exception as e:
             print(f"An error occurred while generating JSON paths: {e}")
@@ -563,7 +573,7 @@ class QuickValidateSynth:
             except Exception as e:
                 print(f"An error occurred while processing {path}: {e}")
         return node_names
-    
+
     def extract_node_name(self, json_path: str) -> str:
         """
         Extract the filename without extension from a given file path.
@@ -581,8 +591,12 @@ class QuickValidateSynth:
         return fn_rm_ext
 
     def get_schema_fn(self, node_name: str) -> str:
-        return f'{self.resolved_schema_dir}/{node_name}_[resolved].json'
-    
+        """
+        Returns the resolved schema path. This method is kept for compatibility,
+        but now always returns the provided resolved_schema_path.
+        """
+        return self.resolved_schema_path
+
     def quick_validate(self):
         for project in self.project_name_list:
             json_paths = self.generate_json_paths(project)
@@ -594,7 +608,7 @@ class QuickValidateSynth:
                 errors = validator.return_errors()
                 errors_dict = json.loads(errors)
                 self.errors[(project, node)] = errors_dict
-                
+
                 if not errors_dict:
                     print(f'=== {project}/{node} is valid ===')
                 else:
