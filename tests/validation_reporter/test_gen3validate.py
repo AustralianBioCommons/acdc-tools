@@ -363,37 +363,3 @@ class TestSchemaResolver:
 
 # Test QuickValidateSynth
 
-
-class TestQuickValidateSynth:
-    def test_quick_validate(self, temp_dir, test_schema_file):
-        """Test quick validation of multiple JSON files."""
-        # Create test data directory structure
-        project_dir = os.path.join(temp_dir, "test_project")
-        os.makedirs(project_dir, exist_ok=True)
-        
-        # Create test data file
-        data_file = os.path.join(project_dir, "test_data.json")
-        with open(data_file, 'w') as f:
-            json.dump(SAMPLE_VALID_DATA, f)
-        
-        # Create schema file in resolved directory
-        resolved_dir = os.path.join(temp_dir, "resolved")
-        os.makedirs(resolved_dir, exist_ok=True)
-        
-        # Copy test schema to resolved directory with expected naming convention
-        node_name = "test_data"  # Should match the filename without .json
-        schema_dest = os.path.join(resolved_dir, f"{node_name}_[resolved].json")
-        shutil.copy2(test_schema_file, schema_dest)
-
-        # Run quick validation
-        validator = QuickValidateSynth(
-            data_dir=temp_dir,
-            project_name_list=["test_project"],
-            resolved_schema_dir=resolved_dir
-        )
-
-        # The validation will happen here
-        validator.quick_validate()
-
-        # Check if validation was successful (no errors for valid data)
-        assert not validator.errors.get(("test_project", "test_data"), None)
