@@ -518,18 +518,23 @@ class QuickValidateSynth:
         """
         try:
             import os
+            base_path = os.path.join(self.data_dir, project_name)
+            print(f"looking for JSON files in: {base_path}")
+            files_in_dir = os.listdir(os.path.join(self.data_dir, project_name))
             json_paths = [
                 os.path.join(self.data_dir, project_name, file)
-                for file in os.listdir(os.path.join(self.data_dir, project_name))
+                for file in files_in_dir
                 if file.endswith('.json')
             ]
             filtered_json_paths = [
                 path for path in json_paths
-                if not any(exclude_node in path for exclude_node in self.exclude_nodes)
+                if not any(exclude_node in os.path.basename(path) for exclude_node in self.exclude_nodes)
             ]
             return filtered_json_paths
         except Exception as e:
             print(f"An error occurred while generating JSON paths: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def read_single_json(self, json_path: str) -> list:
@@ -600,6 +605,8 @@ class QuickValidateSynth:
     def quick_validate(self):
         for project in self.project_name_list:
             json_paths = self.generate_json_paths(project)
+            if not json_paths:
+                raise ValueError(f"No JSON paths found for project '{project}'.")
             for jsn in json_paths:
                 node = self.extract_node_name(jsn)
                 schema_fn = self.get_schema_fn(node)
@@ -610,9 +617,10 @@ class QuickValidateSynth:
                 self.errors[(project, node)] = errors_dict
 
                 if not errors_dict:
-                    print(f'=== {project}/{node} is valid ===')
+                    print(f'{project}/{node} === valid')
                 else:
                     print(f'=== {project}/{node} contains errors ===')
+                    print(f"Errors for {project}/{node}: {errors_dict}")
     
 class SyntheticDataCombiner:
     def __init__(self, input_dir, exclude_files=None):
